@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QOpenGLContext
+from PySide6.QtGui import QFontDatabase, QOpenGLContext
 from PySide6.QtOpenGLWidgets import QOpenGLWidget
 from PySide6.QtWidgets import QLabel
 
@@ -56,8 +56,9 @@ class MpvTile(QOpenGLWidget):
         self.overlay = QLabel(self)
         self.overlay.setStyleSheet(
             "color: white; background: rgba(0, 0, 0, 150); padding: 3px 6px;"
-            "font-family: monospace; font-size: 11px;"
+            "font-size: 11px;"
         )
+        self.overlay.setFont(QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont))
         self.overlay.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self.overlay.move(6, 6)
         self.overlay.setText(f"tile {index}: loading")
