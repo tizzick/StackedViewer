@@ -41,7 +41,7 @@ class MainWindow(QMainWindow):
         # Milestone 2 reuses the spike grid as the player. Esc returns here.
         args = SimpleNamespace(
             video=config.video, rows=config.rows, cols=config.cols, offset=config.offset_min,
-            start=config.start_s, hwdec="auto-safe", benchmark=0, screenshot=None,
+            start=config.start_s, show_stats=config.show_stats, hwdec="auto-safe", benchmark=0, screenshot=None,
         )
         self.player = SpikeWindow(args, self)
         self.player.closed.connect(self._player_closed)

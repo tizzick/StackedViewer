@@ -92,7 +92,7 @@ class MpvTile(QOpenGLWidget):
     ready = Signal(int)  # emitted once the tile has sought to its start position
 
     def __init__(self, index: int, path: str, offset_s: float, hwdec: str = "auto-safe",
-                 first_start_s: float = 0.0, parent=None):
+                 first_start_s: float = 0.0, show_stats: bool = True, parent=None):
         super().__init__(parent)
         self.index = index
         self.path = path
@@ -135,6 +135,8 @@ class MpvTile(QOpenGLWidget):
         self.overlay.move(6, 6)
         self.overlay.setText(f"tile {index}: loading")
         self.overlay.adjustSize()
+        self.show_stats = show_stats
+        self.overlay.setVisible(show_stats)
 
     # ---- OpenGL ---------------------------------------------------------
 
@@ -149,6 +151,8 @@ class MpvTile(QOpenGLWidget):
             self._render_ctx = None
             self.overlay.setText(f"tile {self.index}: could not start video ({exc})")
             self.overlay.adjustSize()
+            self.overlay.setVisible(True)
+            self.show_stats = False  # keep the error on screen
 
     def paintGL(self):
         if self._render_ctx is None:
@@ -220,6 +224,8 @@ class MpvTile(QOpenGLWidget):
         return self.total_drops
 
     def refresh_overlay(self):
+        if not self.show_stats:
+            return
         s = self.stats()
         dropped = self.poll_drops()
         self.overlay.setText(

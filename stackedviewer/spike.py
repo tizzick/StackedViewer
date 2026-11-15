@@ -51,7 +51,8 @@ class SpikeWindow(QWidget):
 
         for i in range(args.rows * args.cols):
             tile = MpvTile(i, args.video, args.offset * 60.0, hwdec=args.hwdec,
-                           first_start_s=getattr(args, "start", 0.0))
+                           first_start_s=getattr(args, "start", 0.0),
+                           show_stats=getattr(args, "show_stats", True))
             tile.clicked.connect(self._toggle_audio)
             tile.ready.connect(self._tile_ready, Qt.ConnectionType.QueuedConnection)
             grid.addWidget(tile, i // args.cols, i % args.cols)

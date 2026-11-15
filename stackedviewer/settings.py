@@ -39,12 +39,18 @@ class Settings:
         except (TypeError, ValueError):
             return 0.0
 
-    def save(self, video: str, rows: int, cols: int, offset_min: float, start_s: float = 0.0) -> None:
+    @property
+    def show_stats(self) -> bool:
+        return str(self._s.value("show_stats", "false")).lower() in ("true", "1")
+
+    def save(self, video: str, rows: int, cols: int, offset_min: float, start_s: float = 0.0,
+             show_stats: bool = False) -> None:
         self._s.setValue("video", video)
         self._s.setValue("rows", rows)
         self._s.setValue("cols", cols)
         self._s.setValue("offset_min", offset_min)
         self._s.setValue("start_s", start_s)
+        self._s.setValue("show_stats", "true" if show_stats else "false")
         self._s.sync()
 
     def _int(self, key: str, default: int, low: int, high: int) -> int:

@@ -45,7 +45,9 @@ On the start screen:
 5. Check the preview: every tile shows the actual frame it will start on, and
    they all update as the slider moves. Tiles that run past the end of the
    video wrap around to the beginning and are marked in orange.
-6. Press **Start**.
+6. Optionally tick **Show playback info on each tile** to overlay each tile's
+   time, frame rate and dropped frames during playback. It is off by default.
+7. Press **Start**.
 
 The file, layout, offset and start point are remembered for next time.
 

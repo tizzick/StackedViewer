@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from PySide6.QtCore import QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QImage, QPainter, QPen
 from PySide6.QtWidgets import (
+    QCheckBox,
     QDoubleSpinBox,
     QFileDialog,
     QFrame,
@@ -50,6 +51,7 @@ class PlayConfig:
     offset_min: float
     duration: float
     start_s: float = 0.0
+    show_stats: bool = False
 
 
 class GridPreview(QWidget):
@@ -251,6 +253,9 @@ class StartScreen(QWidget):
 
         # ---- start ----
         bottom = QHBoxLayout()
+        self.stats_check = QCheckBox("Show playback info on each tile (time, frame rate, dropped frames)")
+        self.stats_check.setChecked(settings.show_stats)
+        bottom.addWidget(self.stats_check)
         bottom.addStretch(1)
         self.start_btn = QPushButton("Start")
         self.start_btn.setObjectName("primary")
@@ -442,8 +447,10 @@ class StartScreen(QWidget):
             offset_min=self.offset_spin.value(),
             duration=self.info["duration"],
             start_s=self.first_start_s(),
+            show_stats=self.stats_check.isChecked(),
         )
-        self.settings.save(config.video, config.rows, config.cols, config.offset_min, config.start_s)
+        self.settings.save(config.video, config.rows, config.cols, config.offset_min, config.start_s,
+                           config.show_stats)
         self.start_requested.emit(config)
 
 
@@ -463,6 +470,7 @@ QSlider::handle:horizontal:hover {{ background: #ffffff; }}
 QSlider::groove:horizontal:disabled {{ background: #1e2128; }}
 QSlider::sub-page:horizontal:disabled {{ background: #2a2e37; }}
 QSlider::handle:horizontal:disabled {{ background: #4a4f5a; }}
+QCheckBox {{ background: transparent; color: #b8bfca; spacing: 8px; }}
 QLabel#notes {{ color: #b8bfca; font-size: 12px; }}
 QFrame#dropZone {{ background: #181b22; border: 1px dashed #3a3f4b; border-radius: 8px; }}
 QFrame#dropZone[dragging="true"] {{ border: 1px dashed {ACCENT}; background: #1c2330; }}
