@@ -19,7 +19,7 @@ import platform
 import sys
 import time
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QSurfaceFormat
 from PySide6.QtWidgets import QApplication, QGridLayout, QWidget
 
@@ -28,9 +28,13 @@ from .tile import MpvTile
 
 
 class SpikeWindow(QWidget):
-    def __init__(self, args):
-        super().__init__()
+    closed = Signal()
+
+    def __init__(self, args, parent=None):
+        super().__init__(parent)
         self.args = args
+        self._shut_down = False
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setWindowTitle(f"StackedViewer spike - {args.rows}x{args.cols}, {args.offset} min offset")
         self.setStyleSheet("background: black;")
         self.resize(1280, 720)
@@ -143,16 +147,20 @@ class SpikeWindow(QWidget):
         if key == Qt.Key.Key_Space:
             self._set_paused(not self._paused)
         elif key == Qt.Key.Key_F:
-            self.showNormal() if self.isFullScreen() else self.showFullScreen()
+            top = self.window()
+            top.showNormal() if top.isFullScreen() else top.showFullScreen()
         elif key in (Qt.Key.Key_Escape, Qt.Key.Key_Q):
             self.close()
         else:
             super().keyPressEvent(event)
 
     def closeEvent(self, event):
-        self._overlay_timer.stop()
-        for t in self.tiles:
-            t.shutdown()
+        if not self._shut_down:
+            self._shut_down = True
+            self._overlay_timer.stop()
+            for t in self.tiles:
+                t.shutdown()
+            self.closed.emit()
         super().closeEvent(event)
 
 

@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QFontDatabase, QOpenGLContext
 from PySide6.QtOpenGLWidgets import QOpenGLWidget
 from PySide6.QtWidgets import QLabel
 
 from .libmpv import mpv
+from .render import RenderContext
 from .sync import format_time, tile_position
 
 
@@ -18,10 +19,74 @@ def _get_proc_address(_ctx, name):
     return int(gl.getProcAddress(name) or 0)
 
 
+# Cheapest rendering path: simple scaling straight to the screen, with no
+# high-precision intermediate buffers. Many small tiles gain nothing from the
+# high-quality path, and it costs GPU time per tile. It also proved unreliable
+# when a tile's first frame is drawn late (the tile stayed black).
+FAST_RENDER_OPTIONS = {
+    "scale": "bilinear",
+    "dscale": "bilinear",
+    "cscale": "bilinear",
+    "dither": "no",
+    "correct_downscaling": "no",
+    "linear_downscaling": "no",
+    "sigmoid_upscaling": "no",
+    "hdr_compute_peak": "no",
+}
+
+
+class _Poller:
+    """One GUI-thread timer that delivers mailbox messages to every live tile."""
+
+    _timer = None
+    _tiles: list = []
+
+    @classmethod
+    def add(cls, tile):
+        if cls._timer is None:
+            cls._timer = QTimer()
+            cls._timer.setTimerType(Qt.TimerType.PreciseTimer)
+            cls._timer.timeout.connect(cls._tick)
+        cls._tiles.append(tile)
+        if not cls._timer.isActive():
+            cls._timer.start(4)
+
+    @classmethod
+    def remove(cls, tile):
+        if tile in cls._tiles:
+            cls._tiles.remove(tile)
+        if not cls._tiles and cls._timer is not None:
+            cls._timer.stop()
+
+    @classmethod
+    def _tick(cls):
+        for tile in list(cls._tiles):
+            tile._poll_flags()
+
+
+class _Mailbox:
+    """Where mpv's threads leave messages for the GUI thread.
+
+    mpv calls back on its own threads. Those callbacks must not touch any Qt
+    object, so they only set fields on this plain Python object, which the
+    tile reads from a timer on the GUI thread.
+    """
+
+    def __init__(self):
+        self.frame = False
+        self.duration = 0.0
+
+    def on_frame(self):
+        self.frame = True
+
+    def on_duration(self, _name, value):
+        if value:
+            self.duration = float(value)
+
+
 class MpvTile(QOpenGLWidget):
     """Plays `path` starting `index * offset_s` seconds in, looping forever."""
 
-    _frame_ready = Signal()
     clicked = Signal(int)
     ready = Signal(int)  # emitted once the tile has sought to its start position
 
@@ -39,6 +104,7 @@ class MpvTile(QOpenGLWidget):
         # Keep a reference: mpv holds a C pointer to this callback.
         self._proc_address_fn = mpv.MpvGlGetProcAddressFn(_get_proc_address)
 
+        self._box = _Mailbox()
         self.player = mpv.MPV(
             vo="libmpv",
             hwdec=hwdec,
@@ -49,10 +115,11 @@ class MpvTile(QOpenGLWidget):
             osc="no",
             input_default_bindings="no",
             input_vo_keyboard="no",
+            **FAST_RENDER_OPTIONS,
         )
-        self.player.observe_property("duration", self._on_duration)
+        self.player.observe_property("duration", self._box.on_duration)
 
-        self._frame_ready.connect(self.update, Qt.ConnectionType.QueuedConnection)
+        _Poller.add(self)
         self.frameSwapped.connect(self._on_swapped)
 
         self.overlay = QLabel(self)
@@ -69,46 +136,44 @@ class MpvTile(QOpenGLWidget):
     # ---- OpenGL ---------------------------------------------------------
 
     def initializeGL(self):
-        self._render_ctx = mpv.MpvRenderContext(
-            self.player,
-            "opengl",
-            opengl_init_params={"get_proc_address": self._proc_address_fn},
-        )
-        # Called on an mpv thread; hop to the GUI thread through a signal.
-        self._render_ctx.update_cb = self._frame_ready.emit
-        self.player.play(self.path)
+        # An exception escaping a Qt virtual method can crash the process.
+        try:
+            self._render_ctx = RenderContext(self.player, self._proc_address_fn)
+            # Called on an mpv thread: it only sets a flag in the mailbox.
+            self._render_ctx.set_update_callback(self._box.on_frame)
+            self.player.play(self.path)
+        except Exception as exc:  # noqa: BLE001
+            self._render_ctx = None
+            self.overlay.setText(f"tile {self.index}: could not start video ({exc})")
+            self.overlay.adjustSize()
 
     def paintGL(self):
         if self._render_ctx is None:
             return
         ratio = self.devicePixelRatioF()
         self._render_ctx.render(
-            flip_y=True,
-            # All tiles render on the one GUI thread. Never wait inside mpv for
-            # a frame's display time: that would stall every other tile.
-            block_for_target_time=False,
-            opengl_fbo={
-                "w": int(self.width() * ratio),
-                "h": int(self.height() * ratio),
-                "fbo": self.defaultFramebufferObject(),
-            },
+            self.defaultFramebufferObject(),
+            int(self.width() * ratio),
+            int(self.height() * ratio),
         )
+
+    def _poll_flags(self):
+        box = self._box
+        if box.frame:
+            box.frame = False
+            self.update()
+        if box.duration and not self.is_ready:
+            self.duration = box.duration
+            self.start_pos = tile_position(self.index, self.offset_s, self.duration)
+            self.player.command_async("seek", str(self.start_pos), "absolute+exact")
+            self.is_ready = True
+            self.ready.emit(self.index)
 
     def _on_swapped(self):
         if self._render_ctx is not None:
             self._render_ctx.report_swap()
 
     # ---- playback -------------------------------------------------------
-
-    def _on_duration(self, _name, value):
-        # Runs on an mpv thread. Property writes and commands are thread-safe.
-        if not value or self.is_ready:
-            return
-        self.duration = float(value)
-        self.start_pos = tile_position(self.index, self.offset_s, self.duration)
-        self.player.command_async("seek", str(self.start_pos), "absolute+exact")
-        self.is_ready = True
-        self.ready.emit(self.index)
 
     def set_paused(self, paused: bool):
         self.player.pause = paused
@@ -170,9 +235,9 @@ class MpvTile(QOpenGLWidget):
 
     def shutdown(self):
         """Free the render context (needs the GL context current), then mpv."""
+        _Poller.remove(self)
         if self._render_ctx is not None:
             self.makeCurrent()
-            self._render_ctx.update_cb = None
             self._render_ctx.free()
             self._render_ctx = None
             self.doneCurrent()

@@ -6,9 +6,9 @@ unless you switch one on.
 
 Built with Python, Qt 6 (PySide6) and libmpv, for Windows and macOS.
 
-**Status: milestone 1, feasibility spike.** There is no start screen yet. The
-spike is a command-line tool that opens a grid and measures how well a machine
-keeps up.
+**Status: milestone 2.** The start screen is done. The player it opens is
+still the milestone 1 test grid: it plays correctly, but has no control bar
+yet.
 
 ## Setup
 
@@ -29,7 +29,31 @@ Then install the libmpv library:
 
 To use a library somewhere else, set `STACKEDVIEWER_LIBMPV` to its folder.
 
-## Running the spike
+## Running
+
+```bash
+python -m stackedviewer
+```
+
+On the start screen:
+
+1. Drop a video onto the window, or use **Choose file...**.
+2. Pick a layout: a preset, or any rows and columns up to 12 x 12.
+3. Set the offset in minutes between each tile and the next (decimals allowed).
+4. Check the preview, which shows where each tile will start. Tiles whose
+   offset runs past the end of the video wrap around to the beginning and are
+   marked in orange.
+5. Press **Start**.
+
+The file, layout and offset are remembered for next time.
+
+During playback: Space pauses and resumes, F toggles fullscreen, Esc returns
+to the start screen. Click a tile to hear it (one tile at a time); click it
+again to mute.
+
+## The test grid on its own
+
+The milestone 1 command-line tool is still available for measuring a machine:
 
 ```bash
 python -m stackedviewer.spike VIDEO --rows 2 --cols 2 --offset 5
@@ -42,9 +66,6 @@ python -m stackedviewer.spike VIDEO --rows 2 --cols 2 --offset 5
 | `--hwdec` | hardware decoding mode: `auto-safe` (default), `auto-copy`, `no` |
 | `--benchmark SECONDS` | measure for that long, print a report, exit |
 | `--fullscreen` | start fullscreen |
-
-Keys: Space pauses and resumes, F toggles fullscreen, Esc or Q quits. Click a
-tile to hear it (one tile at a time); click it again to mute.
 
 Each tile shows its position, actual and source frame rate, dropped frames and
 the hardware decoder in use.

@@ -1,6 +1,6 @@
 import pytest
 
-from stackedviewer.sync import drift, format_time, tile_position
+from stackedviewer.sync import drift, format_time, tile_position, tile_starts
 
 
 def test_first_tile_starts_at_zero():
@@ -40,3 +40,16 @@ def test_drift_across_loop_point():
 def test_format_time():
     assert format_time(0) == "00:00:00"
     assert format_time(3725.9) == "01:02:05"
+
+
+def test_tile_starts_flags_wrapped_tiles():
+    # 2x2 with 20 min offset on a 50 min video
+    assert tile_starts(4, 1200, 3000) == [(0, False), (1200, False), (2400, False), (600, True)]
+
+
+def test_tile_starts_exact_end_counts_as_wrapped():
+    assert tile_starts(2, 3000, 3000) == [(0, False), (0, True)]
+
+
+def test_tile_starts_unknown_duration():
+    assert tile_starts(2, 300, 0) == [(0.0, False), (0.0, False)]
