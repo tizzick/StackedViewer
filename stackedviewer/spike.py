@@ -76,8 +76,7 @@ class SpikeWindow(QWidget):
 
     @staticmethod
     def _drops(tile):
-        s = tile.stats()
-        return s["dropped_output"] + s["dropped_decoder"]
+        return tile.poll_drops()
 
     def _end_benchmark(self):
         wall = time.monotonic() - self._bench_wall
@@ -103,7 +102,7 @@ class SpikeWindow(QWidget):
         for t, s, d0 in zip(self.tiles, stats, self._bench_drops):
             expected = tile_position(t.index, t.offset_s, duration, master)
             dr = drift(s["position"], expected, duration)
-            drops = s["dropped_output"] + s["dropped_decoder"] - d0
+            drops = t.poll_drops() - d0
             total_drops += drops
             if s["source_fps"]:
                 worst_fps = min(worst_fps, s["actual_fps"] / s["source_fps"])
@@ -111,9 +110,11 @@ class SpikeWindow(QWidget):
                   f"{s['hwdec']:<12} {s['actual_fps']:>6.1f} / {s['source_fps']:<6.1f}      "
                   f"{drops:>7}  {dr:+.2f}s")
         print()
-        verdict = "OK" if worst_fps >= 0.95 and total_drops <= len(self.tiles) else "STRUGGLING"
+        shown = max(1.0, stats[0]["source_fps"] * wall * len(self.tiles))
+        drop_pct = 100 * total_drops / shown
+        verdict = "OK" if worst_fps >= 0.95 and drop_pct < 1.0 else "STRUGGLING"
         print(f"  verdict   : {verdict} (slowest tile at {100 * worst_fps:.0f}% of source fps, "
-              f"{total_drops} frames dropped)")
+              f"{total_drops} frames dropped = {drop_pct:.1f}%)")
         print()
 
         if self.args.screenshot:

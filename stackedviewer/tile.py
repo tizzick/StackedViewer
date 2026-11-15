@@ -33,6 +33,8 @@ class MpvTile(QOpenGLWidget):
         self.duration = 0.0
         self.start_pos = 0.0
         self.is_ready = False
+        self.total_drops = 0
+        self._last_drop_reading = 0
         self._render_ctx = None
         # Keep a reference: mpv holds a C pointer to this callback.
         self._proc_address_fn = mpv.MpvGlGetProcAddressFn(_get_proc_address)
@@ -82,6 +84,9 @@ class MpvTile(QOpenGLWidget):
         ratio = self.devicePixelRatioF()
         self._render_ctx.render(
             flip_y=True,
+            # All tiles render on the one GUI thread. Never wait inside mpv for
+            # a frame's display time: that would stall every other tile.
+            block_for_target_time=False,
             opengl_fbo={
                 "w": int(self.width() * ratio),
                 "h": int(self.height() * ratio),
@@ -134,9 +139,21 @@ class MpvTile(QOpenGLWidget):
             "height": params.get("h", 0),
         }
 
+    def poll_drops(self) -> int:
+        """Running total of dropped frames. mpv resets its own counters each
+        time the file loops, so accumulate the increases instead."""
+        p = self.player
+        reading = int(p.frame_drop_count or 0) + int(p.decoder_frame_drop_count or 0)
+        if reading >= self._last_drop_reading:
+            self.total_drops += reading - self._last_drop_reading
+        else:
+            self.total_drops += reading
+        self._last_drop_reading = reading
+        return self.total_drops
+
     def refresh_overlay(self):
         s = self.stats()
-        dropped = s["dropped_output"] + s["dropped_decoder"]
+        dropped = self.poll_drops()
         self.overlay.setText(
             f"tile {self.index}  {format_time(s['position'])}  "
             f"{s['actual_fps']:.1f}/{s['source_fps']:.1f} fps  "
