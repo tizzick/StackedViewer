@@ -471,6 +471,10 @@ QSlider::groove:horizontal:disabled {{ background: #1e2128; }}
 QSlider::sub-page:horizontal:disabled {{ background: #2a2e37; }}
 QSlider::handle:horizontal:disabled {{ background: #4a4f5a; }}
 QCheckBox {{ background: transparent; color: #b8bfca; spacing: 8px; }}
+QCheckBox::indicator {{ width: 14px; height: 14px; border: 1px solid #6b7280; border-radius: 3px;
+                        background: #181b22; }}
+QCheckBox::indicator:hover {{ border-color: {ACCENT}; }}
+QCheckBox::indicator:checked {{ background: {ACCENT}; border: 3px solid #181b22; outline: none; }}
 QLabel#notes {{ color: #b8bfca; font-size: 12px; }}
 QFrame#dropZone {{ background: #181b22; border: 1px dashed #3a3f4b; border-radius: 8px; }}
 QFrame#dropZone[dragging="true"] {{ border: 1px dashed {ACCENT}; background: #1c2330; }}
