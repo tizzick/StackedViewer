@@ -31,11 +31,20 @@ class Settings:
         except (TypeError, ValueError):
             return 5.0
 
-    def save(self, video: str, rows: int, cols: int, offset_min: float) -> None:
+    @property
+    def start_s(self) -> float:
+        """Where the first tile started last time, for the remembered video."""
+        try:
+            return max(0.0, float(self._s.value("start_s", 0.0)))
+        except (TypeError, ValueError):
+            return 0.0
+
+    def save(self, video: str, rows: int, cols: int, offset_min: float, start_s: float = 0.0) -> None:
         self._s.setValue("video", video)
         self._s.setValue("rows", rows)
         self._s.setValue("cols", cols)
         self._s.setValue("offset_min", offset_min)
+        self._s.setValue("start_s", start_s)
         self._s.sync()
 
     def _int(self, key: str, default: int, low: int, high: int) -> int:

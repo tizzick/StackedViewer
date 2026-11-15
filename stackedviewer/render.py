@@ -80,3 +80,62 @@ class RenderContext:
         if self._handle is not None:
             mpv._mpv_render_context_free(self._handle)
             self._handle = None
+
+
+# Parameter ids from libmpv/render.h that python-mpv does not list.
+_SW_SIZE, _SW_FORMAT, _SW_STRIDE, _SW_POINTER = 17, 18, 19, 20
+_BLOCK_FOR_TARGET_TIME = 12
+
+
+class SoftwareRenderContext:
+    """An mpv render context that draws into plain memory, with no OpenGL.
+
+    Used for still thumbnails. `render()` returns the current frame as RGBX
+    bytes of the given size.
+    """
+
+    def __init__(self, player):
+        self._update_wrappers = []
+        api_type = ctypes.create_string_buffer(b"sw")
+        create_array = (mpv.MpvRenderParam * 2)()
+        create_array[0].type_id = mpv.MpvRenderParam.TYPES["api_type"][0]
+        create_array[0].data = ctypes.cast(api_type, ctypes.c_void_p)
+
+        self._handle_buf = ctypes.cast(
+            ctypes.create_string_buffer(ctypes.sizeof(mpv.MpvRenderCtxHandle)),
+            ctypes.POINTER(mpv.MpvRenderCtxHandle),
+        )
+        mpv._mpv_render_context_create(self._handle_buf, player.handle, create_array)
+        self._handle = self._handle_buf.contents
+
+    def set_update_callback(self, callback):
+        wrapper = mpv.RenderUpdateFn(lambda _userdata: callback())
+        self._update_wrappers.append(wrapper)
+        mpv._mpv_render_context_set_update_callback(self._handle, wrapper, None)
+
+    def render(self, width: int, height: int) -> bytes:
+        size = (ctypes.c_int * 2)(width, height)
+        fmt = ctypes.create_string_buffer(b"rgb0")
+        stride = ctypes.c_size_t(width * 4)
+        pixels = ctypes.create_string_buffer(width * height * 4)
+        block = ctypes.c_int(0)
+
+        array = (mpv.MpvRenderParam * 6)()
+        array[0].type_id = _SW_SIZE
+        array[0].data = ctypes.cast(size, ctypes.c_void_p)
+        array[1].type_id = _SW_FORMAT
+        array[1].data = ctypes.cast(fmt, ctypes.c_void_p)
+        array[2].type_id = _SW_STRIDE
+        array[2].data = ctypes.cast(ctypes.pointer(stride), ctypes.c_void_p)
+        array[3].type_id = _SW_POINTER
+        array[3].data = ctypes.cast(pixels, ctypes.c_void_p)
+        array[4].type_id = _BLOCK_FOR_TARGET_TIME
+        array[4].data = ctypes.cast(ctypes.pointer(block), ctypes.c_void_p)
+        mpv._mpv_render_context_render(self._handle, array)
+        return pixels.raw
+
+    def free(self):
+        """Destroy the context. Blocks until mpv has stopped calling back."""
+        if self._handle is not None:
+            mpv._mpv_render_context_free(self._handle)
+            self._handle = None

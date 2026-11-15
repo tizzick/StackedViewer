@@ -53,3 +53,8 @@ def test_tile_starts_exact_end_counts_as_wrapped():
 
 def test_tile_starts_unknown_duration():
     assert tile_starts(2, 300, 0) == [(0.0, False), (0.0, False)]
+
+
+def test_tile_starts_with_first_start():
+    # first tile at 10 min, 20 min offset, 50 min video
+    assert tile_starts(3, 1200, 3000, first_start_s=600) == [(600, False), (1800, False), (0, True)]

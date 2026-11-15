@@ -28,10 +28,14 @@ def format_time(seconds: float) -> str:
     return f"{seconds // 3600:02d}:{seconds % 3600 // 60:02d}:{seconds % 60:02d}"
 
 
-def tile_starts(count: int, offset_s: float, duration_s: float) -> list[tuple[float, bool]]:
-    """Start position of each tile, and whether its offset wrapped past the
-    end of the video."""
+def tile_starts(count: int, offset_s: float, duration_s: float,
+                first_start_s: float = 0.0) -> list[tuple[float, bool]]:
+    """Start position of each tile, and whether it wrapped past the end of the
+    video. The first tile starts at `first_start_s`."""
     return [
-        (tile_position(i, offset_s, duration_s), duration_s > 0 and i * offset_s >= duration_s)
+        (
+            tile_position(i, offset_s, duration_s, first_start_s),
+            duration_s > 0 and first_start_s + i * offset_s >= duration_s,
+        )
         for i in range(count)
     ]

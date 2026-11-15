@@ -85,16 +85,19 @@ class _Mailbox:
 
 
 class MpvTile(QOpenGLWidget):
-    """Plays `path` starting `index * offset_s` seconds in, looping forever."""
+    """Plays `path` starting at `first_start_s + index * offset_s`, wrapped to
+    the video's length, and loops forever."""
 
     clicked = Signal(int)
     ready = Signal(int)  # emitted once the tile has sought to its start position
 
-    def __init__(self, index: int, path: str, offset_s: float, hwdec: str = "auto-safe", parent=None):
+    def __init__(self, index: int, path: str, offset_s: float, hwdec: str = "auto-safe",
+                 first_start_s: float = 0.0, parent=None):
         super().__init__(parent)
         self.index = index
         self.path = path
         self.offset_s = offset_s
+        self.first_start_s = first_start_s
         self.duration = 0.0
         self.start_pos = 0.0
         self.is_ready = False
@@ -164,7 +167,7 @@ class MpvTile(QOpenGLWidget):
             self.update()
         if box.duration and not self.is_ready:
             self.duration = box.duration
-            self.start_pos = tile_position(self.index, self.offset_s, self.duration)
+            self.start_pos = tile_position(self.index, self.offset_s, self.duration, self.first_start_s)
             self.player.command_async("seek", str(self.start_pos), "absolute+exact")
             self.is_ready = True
             self.ready.emit(self.index)

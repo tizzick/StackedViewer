@@ -50,7 +50,8 @@ class SpikeWindow(QWidget):
         self._bench_cpu = None
 
         for i in range(args.rows * args.cols):
-            tile = MpvTile(i, args.video, args.offset * 60.0, hwdec=args.hwdec)
+            tile = MpvTile(i, args.video, args.offset * 60.0, hwdec=args.hwdec,
+                           first_start_s=getattr(args, "start", 0.0))
             tile.clicked.connect(self._toggle_audio)
             tile.ready.connect(self._tile_ready, Qt.ConnectionType.QueuedConnection)
             grid.addWidget(tile, i // args.cols, i % args.cols)
@@ -171,6 +172,8 @@ def parse_args(argv=None):
     p.add_argument("--rows", type=int, default=2)
     p.add_argument("--cols", type=int, default=2)
     p.add_argument("--offset", type=float, default=5.0, help="minutes between tiles (default 5)")
+    p.add_argument("--start", type=float, default=0.0, metavar="SECONDS",
+                   help="where the first tile starts, in seconds (default 0)")
     p.add_argument("--hwdec", default="auto-safe",
                    help="mpv hardware decoding mode: auto-safe (default), auto-copy, no, ...")
     p.add_argument("--benchmark", type=float, default=0, metavar="SECONDS",
